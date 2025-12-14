@@ -1,6 +1,8 @@
 package com.demo.rest.exception;
 
 import com.demo.rest.dto.ErrorResponseDto;
+import jakarta.xml.ws.WebServiceException;
+import jakarta.xml.ws.soap.SOAPFaultException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -9,8 +11,6 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
-import org.springframework.ws.client.WebServiceIOException;
-import org.springframework.ws.soap.client.SoapFaultClientException;
 
 import java.time.LocalDateTime;
 import java.util.stream.Collectors;
@@ -49,18 +49,20 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Handle SOAP fault exceptions.
+     * Handle SOAP fault exceptions (JAX-WS).
      */
-    @ExceptionHandler(SoapFaultClientException.class)
+    @ExceptionHandler(SOAPFaultException.class)
     public ResponseEntity<ErrorResponseDto> handleSoapFaultException(
-            SoapFaultClientException ex,
+            SOAPFaultException ex,
             WebRequest request) {
 
         log.error("SOAP fault: {}", ex.getMessage());
 
+        String faultMessage = ex.getFault() != null ? ex.getFault().getFaultString() : ex.getMessage();
+
         ErrorResponseDto error = ErrorResponseDto.builder()
                 .errorCode("SOAP_FAULT")
-                .message("Error from backend service: " + ex.getFaultStringOrReason())
+                .message("Error from backend service: " + faultMessage)
                 .timestamp(LocalDateTime.now())
                 .path(request.getDescription(false).replace("uri=", ""))
                 .build();
@@ -69,14 +71,14 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Handle SOAP connection errors.
+     * Handle JAX-WS connection errors.
      */
-    @ExceptionHandler(WebServiceIOException.class)
-    public ResponseEntity<ErrorResponseDto> handleWebServiceIOException(
-            WebServiceIOException ex,
+    @ExceptionHandler(WebServiceException.class)
+    public ResponseEntity<ErrorResponseDto> handleWebServiceException(
+            WebServiceException ex,
             WebRequest request) {
 
-        log.error("SOAP service connection error: {}", ex.getMessage());
+        log.error("SOAP service error: {}", ex.getMessage());
 
         ErrorResponseDto error = ErrorResponseDto.builder()
                 .errorCode("SERVICE_UNAVAILABLE")

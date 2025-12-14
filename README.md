@@ -1,6 +1,6 @@
 # REST to SOAP Integration Demo
 
-A Spring Boot 3.4.6 application demonstrating REST to SOAP integration with MapStruct mapping and OpenAPI documentation.
+A Spring Boot 3.4.6 application demonstrating REST to SOAP integration with WSDL-first approach, MapStruct mapping, and OpenAPI documentation.
 
 ## Architecture
 
@@ -17,13 +17,13 @@ A Spring Boot 3.4.6 application demonstrating REST to SOAP integration with MapS
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐  │
 │  │  Controller │───▶│   Service   │───▶│  MapStruct  │───▶│ SOAP Client │  │
-│  │   (REST)    │    │   (Logic)   │    │  (Mapping)  │    │ (Template)  │  │
+│  │   (REST)    │    │   (Logic)   │    │  (Mapping)  │    │  (JAX-WS)   │  │
 │  └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘  │
 │         │                                                        │          │
 │         │                                                        │          │
 │  ┌──────▼──────┐                                        ┌───────▼───────┐  │
-│  │   OpenAPI   │                                        │ JAXB Classes  │  │
-│  │ (Swagger UI)│                                        │(from XSD)     │  │
+│  │   OpenAPI   │                                        │ JAX-WS Stubs  │  │
+│  │ (Swagger UI)│                                        │ (from WSDL)   │  │
 │  └─────────────┘                                        └───────────────┘  │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
@@ -42,7 +42,7 @@ A Spring Boot 3.4.6 application demonstrating REST to SOAP integration with MapS
 ## Project Structure
 
 ```
-rest-soap-demo/
+soap-demo/
 ├── pom.xml                          # Parent POM
 ├── soap-service/                    # SOAP Backend Service
 │   ├── pom.xml
@@ -58,7 +58,7 @@ rest-soap-demo/
 │       └── resources/
 │           ├── application.yml
 │           └── xsd/
-│               └── order.xsd                # XSD Schema definition
+│               └── order.xsd                # XSD Schema definition (source of truth)
 │
 └── rest-service/                    # REST Frontend Service
     ├── pom.xml
@@ -66,14 +66,14 @@ rest-soap-demo/
         ├── java/com/demo/rest/
         │   ├── RestServiceApplication.java
         │   ├── config/
-        │   │   ├── SoapClientConfig.java    # SOAP client configuration
+        │   │   ├── SoapClientConfig.java    # JAX-WS client configuration
         │   │   └── OpenApiConfig.java       # Swagger/OpenAPI configuration
         │   ├── controller/
         │   │   └── OrderController.java     # REST endpoints
         │   ├── service/
         │   │   └── OrderService.java        # Business logic
         │   ├── client/
-        │   │   └── SoapOrderClient.java     # SOAP client
+        │   │   └── SoapOrderClient.java     # JAX-WS SOAP client
         │   ├── mapper/                      # MapStruct mappers
         │   │   ├── OrderMapper.java
         │   │   ├── CustomerMapper.java
@@ -87,50 +87,68 @@ rest-soap-demo/
         │       └── GlobalExceptionHandler.java
         └── resources/
             ├── application.yml
-            └── xsd/
-                └── order.xsd                # Same XSD for client generation
+            └── wsdl/
+                └── orders.wsdl              # Local WSDL for client generation
 ```
 
 ## Key Concepts Demonstrated
 
-### 1. XSD Schema (Contract-First Design)
+### 1. WSDL-First Approach
 
-The `order.xsd` defines the SOAP message structure:
+The REST service uses a **WSDL-first** approach for SOAP client generation:
 
-```xml
-<!-- Request/Response types -->
-<xs:element name="CreateOrderRequest">
-    <xs:complexType>
-        <xs:sequence>
-            <xs:element name="customer" type="tns:CustomerType"/>
-            <xs:element name="items" type="tns:OrderItemType" maxOccurs="unbounded"/>
-            ...
-        </xs:sequence>
-    </xs:complexType>
-</xs:element>
-```
+- **Source of truth**: `soap-service/src/main/resources/xsd/order.xsd`
+- **WSDL generation**: Spring WS auto-generates WSDL from XSD at runtime
+- **Client generation**: `rest-service` uses a local copy of the WSDL to generate JAX-WS stubs
 
-### 2. WSDL Generation
+This approach eliminates XSD duplication between services.
 
-Spring WS auto-generates WSDL from XSD at runtime:
-- **WSDL URL**: http://localhost:8081/ws/orders.wsdl
-- **Endpoint**: http://localhost:8081/ws
+### 2. JAX-WS Client Generation
 
-### 3. JAXB Class Generation
-
-Maven plugin generates Java classes from XSD:
+Maven plugin generates Java client stubs from WSDL:
 
 ```xml
 <plugin>
-    <groupId>org.codehaus.mojo</groupId>
-    <artifactId>jaxb2-maven-plugin</artifactId>
+    <groupId>com.sun.xml.ws</groupId>
+    <artifactId>jaxws-maven-plugin</artifactId>
+    <version>4.0.2</version>
     <configuration>
-        <sources>
-            <source>${project.basedir}/src/main/resources/xsd</source>
-        </sources>
+        <wsdlDirectory>${project.basedir}/src/main/resources/wsdl</wsdlDirectory>
+        <wsdlFiles>
+            <wsdlFile>orders.wsdl</wsdlFile>
+        </wsdlFiles>
         <packageName>com.demo.rest.generated</packageName>
     </configuration>
 </plugin>
+```
+
+Generated classes include:
+- `OrdersService` - JAX-WS service client
+- `OrdersPort` - Type-safe SOAP operations interface
+- `CreateOrderRequest`, `CreateOrderResponse`, etc. - JAXB data types
+
+### 3. JAX-WS SOAP Client
+
+The SOAP client uses generated JAX-WS stubs for type-safe SOAP calls:
+
+```java
+@Configuration
+public class SoapClientConfig {
+
+    @Bean
+    public OrdersPort ordersPort(OrdersService ordersService) {
+        OrdersPort port = ordersService.getOrdersPortSoap11();
+
+        // Override endpoint URL from configuration
+        BindingProvider bindingProvider = (BindingProvider) port;
+        bindingProvider.getRequestContext().put(
+                BindingProvider.ENDPOINT_ADDRESS_PROPERTY,
+                soapServiceUrl
+        );
+
+        return port;
+    }
+}
 ```
 
 ### 4. MapStruct Mapping
@@ -156,12 +174,6 @@ public interface OrderMapper {
 REST API is documented using OpenAPI 3.0:
 - **Swagger UI**: http://localhost:8082/swagger-ui.html
 - **OpenAPI Spec**: http://localhost:8082/v3/api-docs
-
-OpenAPI provides:
-- Interactive API documentation
-- Request/response schema visualization
-- Try-it-out functionality for testing
-- Code generation for clients
 
 ## How to Run
 
@@ -269,7 +281,7 @@ curl http://localhost:8081/ws/orders.wsdl
    - AddressDto → AddressType (via AddressMapper)
          │
          ▼
-5. SoapOrderClient sends SOAP request via WebServiceTemplate
+5. SoapOrderClient sends SOAP request via JAX-WS OrdersPort
          │
          ▼
 6. SOAP Service processes and returns CreateOrderResponse
@@ -283,19 +295,46 @@ curl http://localhost:8081/ws/orders.wsdl
 8. REST Response (JSON) returned to client
 ```
 
+## Updating the WSDL
+
+When the SOAP service's XSD changes:
+
+1. Start the SOAP service
+2. Fetch the updated WSDL:
+   ```bash
+   curl http://localhost:8081/ws/orders.wsdl > rest-service/src/main/resources/wsdl/orders.wsdl
+   ```
+3. Rebuild the REST service to regenerate JAX-WS stubs:
+   ```bash
+   cd rest-service && mvn clean compile
+   ```
+
 ## Technologies Used
 
 | Technology | Purpose |
 |------------|---------|
 | Spring Boot 3.4.6 | Application framework |
-| Spring Web Services | SOAP endpoint & client |
+| Spring Web Services | SOAP endpoint (server-side) |
+| JAX-WS 4.0.2 | SOAP client (WSDL-first) |
 | JAXB | XML/Java binding |
 | MapStruct 1.5.5 | Object mapping |
 | Lombok | Boilerplate reduction |
-| SpringDoc OpenAPI 2.6 | API documentation |
+| SpringDoc OpenAPI 2.8.4 | API documentation |
 | Jakarta Validation | Request validation |
 
 ## Why These Technologies?
+
+### WSDL-First over XSD Duplication
+- **Single source of truth** - XSD only in SOAP service
+- **Contract-driven** - Client generated from the actual service contract
+- **Type-safe** - JAX-WS generates proper service interfaces
+- **Maintainable** - No risk of XSD drift between services
+
+### JAX-WS over Spring WebServiceTemplate
+- **Standard Java EE API** - More portable
+- **Type-safe operations** - `ordersPort.createOrder(request)` vs generic `marshalSendAndReceive()`
+- **WSDL-first native** - Designed for WSDL-based code generation
+- **Better tooling** - Industry-standard wsimport
 
 ### MapStruct over Manual Mapping
 - **Compile-time code generation** - no reflection overhead
@@ -308,9 +347,3 @@ curl http://localhost:8081/ws/orders.wsdl
 - **Interactive documentation** - Swagger UI for testing
 - **Modern tooling** - Code generators for many languages
 - **REST-native** - Designed for RESTful APIs
-
-### Contract-First SOAP Design
-- **Clear contract** - XSD defines exact message structure
-- **Language-agnostic** - Any language can consume WSDL
-- **Validation built-in** - XML schema validation
-- **Versioning** - Namespace-based versioning

@@ -4,28 +4,28 @@ import com.demo.rest.generated.CreateOrderRequest;
 import com.demo.rest.generated.CreateOrderResponse;
 import com.demo.rest.generated.GetOrderRequest;
 import com.demo.rest.generated.GetOrderResponse;
+import com.demo.rest.generated.OrdersPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.ws.client.core.WebServiceTemplate;
 
 /**
  * SOAP Client for communicating with the Order SOAP Service.
  *
- * This client uses Spring's WebServiceTemplate to make SOAP calls.
- * It abstracts the SOAP communication details from the service layer.
+ * This client uses the JAX-WS generated stubs (WSDL-first approach).
+ * The OrdersPort is generated from the WSDL and provides type-safe SOAP operations.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class SoapOrderClient {
 
-    private final WebServiceTemplate webServiceTemplate;
+    private final OrdersPort ordersPort;
 
     /**
      * Send a CreateOrder request to the SOAP service.
      *
-     * The WebServiceTemplate:
+     * Uses the JAX-WS generated port which:
      * 1. Marshals the request object to XML
      * 2. Wraps it in a SOAP envelope
      * 3. Sends it to the SOAP service
@@ -39,8 +39,7 @@ public class SoapOrderClient {
         log.info("Sending CreateOrder SOAP request for customer: {}",
                 request.getCustomer().getCustomerId());
 
-        CreateOrderResponse response = (CreateOrderResponse) webServiceTemplate
-                .marshalSendAndReceive(request);
+        CreateOrderResponse response = ordersPort.createOrder(request);
 
         log.info("Received CreateOrder SOAP response with orderId: {}",
                 response.getOrderId());
@@ -60,8 +59,7 @@ public class SoapOrderClient {
         GetOrderRequest request = new GetOrderRequest();
         request.setOrderId(orderId);
 
-        GetOrderResponse response = (GetOrderResponse) webServiceTemplate
-                .marshalSendAndReceive(request);
+        GetOrderResponse response = ordersPort.getOrder(request);
 
         log.info("Received GetOrder SOAP response for orderId: {}", orderId);
 

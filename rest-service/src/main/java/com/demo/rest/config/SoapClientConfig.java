@@ -1,16 +1,17 @@
 package com.demo.rest.config;
 
+import com.demo.rest.generated.OrdersPort;
+import com.demo.rest.generated.OrdersService;
+import jakarta.xml.ws.BindingProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.oxm.jaxb.Jaxb2Marshaller;
-import org.springframework.ws.client.core.WebServiceTemplate;
 
 /**
- * Configuration for the SOAP client.
+ * Configuration for the SOAP client using JAX-WS (WSDL-first approach).
  *
- * This sets up the WebServiceTemplate used to communicate with the SOAP service.
- * The Jaxb2Marshaller handles serialization/deserialization of SOAP messages.
+ * This configuration creates a JAX-WS client from the generated stubs.
+ * The stubs are generated from the WSDL file during build time by jaxws-maven-plugin.
  */
 @Configuration
 public class SoapClientConfig {
@@ -19,33 +20,33 @@ public class SoapClientConfig {
     private String soapServiceUrl;
 
     /**
-     * Configure the JAXB2 Marshaller.
+     * Create the JAX-WS service client.
      *
-     * The marshaller converts Java objects to XML (for SOAP requests)
-     * and XML back to Java objects (for SOAP responses).
-     *
-     * It's configured to scan the generated package where JAXB classes reside.
+     * The OrdersService is generated from the WSDL by jaxws-maven-plugin.
+     * It provides type-safe access to the SOAP operations.
      */
     @Bean
-    public Jaxb2Marshaller marshaller() {
-        Jaxb2Marshaller marshaller = new Jaxb2Marshaller();
-        // Package containing the JAXB-generated classes from XSD
-        marshaller.setContextPath("com.demo.rest.generated");
-        return marshaller;
+    public OrdersService ordersService() {
+        return new OrdersService();
     }
 
     /**
-     * Configure the WebServiceTemplate.
+     * Create the OrdersPort proxy for making SOAP calls.
      *
-     * This is the main client for making SOAP calls.
-     * It uses the marshaller for XML conversion and the configured URL.
+     * The port is configured with the runtime endpoint URL from properties.
+     * This allows the endpoint to be different from the WSDL-defined location.
      */
     @Bean
-    public WebServiceTemplate webServiceTemplate(Jaxb2Marshaller marshaller) {
-        WebServiceTemplate template = new WebServiceTemplate();
-        template.setDefaultUri(soapServiceUrl);
-        template.setMarshaller(marshaller);
-        template.setUnmarshaller(marshaller);
-        return template;
+    public OrdersPort ordersPort(OrdersService ordersService) {
+        OrdersPort port = ordersService.getOrdersPortSoap11();
+
+        // Override the endpoint URL from configuration
+        BindingProvider bindingProvider = (BindingProvider) port;
+        bindingProvider.getRequestContext().put(
+                BindingProvider.ENDPOINT_ADDRESS_PROPERTY,
+                soapServiceUrl
+        );
+
+        return port;
     }
 }
