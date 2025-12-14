@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(copy:*)"
+      "Bash(copy:*)",
+      "Bash(cd:*)",
+      "Bash(mvn clean compile:*)"
     ],
     "deny": [],
     "ask": []
