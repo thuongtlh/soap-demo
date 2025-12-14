@@ -1,0 +1,32 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: rest-service
+
+# SOAP Service Configuration
+soap:
+  service:
+    url: http://localhost:8081/ws
+
+# OpenAPI / Swagger Configuration
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operationsSorter: method
+    tagsSorter: alpha
+    display-request-duration: true
+  show-actuator: false
+
+# Logging Configuration
+logging:
+  level:
+    com.demo.rest: DEBUG
+    org.springframework.ws: DEBUG
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"

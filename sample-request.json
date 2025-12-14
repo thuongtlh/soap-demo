@@ -1,0 +1,45 @@
+{
+  "customer": {
+    "customerId": "CUST-001",
+    "firstName": "John",
+    "lastName": "Doe",
+    "email": "john.doe@example.com",
+    "phone": "+1-555-123-4567",
+    "shippingAddress": {
+      "street": "123 Main Street",
+      "city": "New York",
+      "state": "NY",
+      "zipCode": "10001",
+      "country": "USA"
+    },
+    "billingAddress": {
+      "street": "456 Oak Avenue",
+      "city": "New York",
+      "state": "NY",
+      "zipCode": "10002",
+      "country": "USA"
+    }
+  },
+  "items": [
+    {
+      "productId": "PROD-001",
+      "productName": "Wireless Headphones",
+      "quantity": 2,
+      "unitPrice": 49.99
+    },
+    {
+      "productId": "PROD-002",
+      "productName": "Phone Case",
+      "quantity": 1,
+      "unitPrice": 19.99
+    },
+    {
+      "productId": "PROD-003",
+      "productName": "USB-C Cable",
+      "quantity": 3,
+      "unitPrice": 9.99
+    }
+  ],
+  "notes": "Please gift wrap all items",
+  "priority": false
+}
