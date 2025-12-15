@@ -347,3 +347,26 @@ When the SOAP service's XSD changes:
 - **Interactive documentation** - Swagger UI for testing
 - **Modern tooling** - Code generators for many languages
 - **REST-native** - Designed for RESTful APIs
+
+## 📋 Documentation
+
+- **[Main Documentation](docs/README.md)** - Architecture, sequence diagrams, and data models
+- **[Technical Debt Analysis](docs/debt/)** - Comprehensive analysis of technical debt and scaling issues
+
+### Technical Debt & Scaling
+
+This is a **demo/prototype project**. For production deployment, see the [Technical Debt Documentation](docs/debt/) which identifies:
+
+- **56 issues** across architecture, code quality, security, and observability
+- **10 critical issues** that must be fixed before production
+- **Estimated 14-16 weeks** minimum for production readiness
+- **Production Readiness Score: 15/100**
+
+**Key Issues:**
+- ❌ No data persistence (in-memory only)
+- ❌ No authentication or authorization
+- ❌ No HTTPS/TLS encryption
+- ❌ No test coverage (0%)
+- ❌ No monitoring or health checks
+
+See [docs/debt/README.md](docs/debt/README.md) for detailed analysis and roadmap.
