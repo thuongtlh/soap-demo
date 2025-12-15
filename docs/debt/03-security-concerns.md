@@ -21,8 +21,11 @@ This document identifies security vulnerabilities, authentication/authorization 
 **Current State**:
 ```java
 @PostMapping
-public ResponseEntity<CreateOrderResponseDto> createOrder(@Valid @RequestBody CreateOrderRequestDto request) {
-    // No authentication check
+public ResponseEntity<CreateOrderResponseDto> createOrder(
+        @Valid @RequestBody CreateOrderRequestDto request) {
+    // No authentication check - any anonymous user can create orders
+    CreateOrderResponseDto response = orderService.createOrder(request);
+    return ResponseEntity.ok(response);
 }
 ```
 

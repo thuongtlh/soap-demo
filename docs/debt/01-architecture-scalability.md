@@ -212,14 +212,23 @@ soap:
 
 ---
 
-## Scaling Targets
+## Estimated Scaling Targets
+
+**Note**: These are rough estimates based on common Spring Boot benchmarks and typical SOAP overhead. Actual numbers require load testing.
 
 Without these fixes, the system is estimated to handle:
-- **~100 concurrent users** (with synchronous blocking)
-- **~1000 requests/minute** (limited by single instance)
+- **~100 concurrent users** (limited by synchronous blocking and single-threaded I/O wait)
+- **~1,000 requests/minute** (single instance, no optimization, SOAP overhead)
 - **Loss of all data on restart** (in-memory storage)
 
 With proper fixes, potential targets:
-- **10,000+ concurrent users** (with async + horizontal scaling)
-- **100,000+ requests/minute** (with load balancing + caching)
-- **99.9% uptime** (with resilience patterns + persistence)
+- **10,000+ concurrent users** (with async + horizontal scaling + connection pooling)
+- **100,000+ requests/minute** (multiple instances + load balancing + caching)
+- **99.9% uptime** (with circuit breakers + persistence + health checks)
+
+These estimates assume:
+- Average request processing time: 50-100ms (REST) + 100-200ms (SOAP)
+- Standard Spring Boot configuration with Tomcat (200 threads default)
+- No heavy computation in business logic
+- Typical database query performance
+- Load testing required to validate actual capacity

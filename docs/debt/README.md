@@ -114,8 +114,8 @@ Monitoring, logging, and operational readiness gaps.
 
 ### Issues by Priority
 
-#### 🔴 P0 - Critical (5 issues, 10-13 weeks)
-Cannot deploy to production without these:
+#### 🔴 P0 - Critical (10 issues, 10-13 weeks)
+Cannot deploy to production without these (top 5 shown):
 1. No data persistence → PostgreSQL (2-3 weeks)
 2. No authentication → OAuth 2.0/JWT (2-3 weeks)
 3. No HTTPS → TLS (1 week)
