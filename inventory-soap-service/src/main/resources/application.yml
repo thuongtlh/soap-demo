@@ -1,0 +1,13 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: inventory-soap-service
+
+logging:
+  level:
+    org.springframework.ws: DEBUG
+    com.demo.inventory: DEBUG
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"

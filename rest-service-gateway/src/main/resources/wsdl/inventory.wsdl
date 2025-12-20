@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                  xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+                  xmlns:tns="http://demo.com/soap/inventory"
+                  targetNamespace="http://demo.com/soap/inventory"
+                  name="InventoryService">
+
+    <wsdl:types>
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                   xmlns:tns="http://demo.com/soap/inventory"
+                   targetNamespace="http://demo.com/soap/inventory"
+                   elementFormDefault="qualified">
+
+            <!-- Inventory Item Type -->
+            <xs:complexType name="InventoryItemType">
+                <xs:sequence>
+                    <xs:element name="productId" type="xs:string"/>
+                    <xs:element name="productName" type="xs:string"/>
+                    <xs:element name="availableQuantity" type="xs:int"/>
+                    <xs:element name="reservedQuantity" type="xs:int"/>
+                    <xs:element name="warehouseLocation" type="xs:string"/>
+                    <xs:element name="unitPrice" type="xs:decimal"/>
+                </xs:sequence>
+            </xs:complexType>
+
+            <!-- Inventory Status Enum -->
+            <xs:simpleType name="InventoryStatusType">
+                <xs:restriction base="xs:string">
+                    <xs:enumeration value="IN_STOCK"/>
+                    <xs:enumeration value="LOW_STOCK"/>
+                    <xs:enumeration value="OUT_OF_STOCK"/>
+                    <xs:enumeration value="RESERVED"/>
+                </xs:restriction>
+            </xs:simpleType>
+
+            <!-- Reservation Item Type -->
+            <xs:complexType name="ReservationItemType">
+                <xs:sequence>
+                    <xs:element name="productId" type="xs:string"/>
+                    <xs:element name="requestedQuantity" type="xs:int"/>
+                </xs:sequence>
+            </xs:complexType>
+
+            <!-- Reservation Result Type -->
+            <xs:complexType name="ReservationResultType">
+                <xs:sequence>
+                    <xs:element name="productId" type="xs:string"/>
+                    <xs:element name="requestedQuantity" type="xs:int"/>
+                    <xs:element name="reservedQuantity" type="xs:int"/>
+                    <xs:element name="status" type="tns:InventoryStatusType"/>
+                    <xs:element name="message" type="xs:string" minOccurs="0"/>
+                </xs:sequence>
+            </xs:complexType>
+
+            <!-- Check Inventory Request -->
+            <xs:element name="CheckInventoryRequest">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="productIds" type="xs:string" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+
+            <!-- Reserve Inventory Request -->
+            <xs:element name="ReserveInventoryRequest">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="orderId" type="xs:string"/>
+                        <xs:element name="items" type="tns:ReservationItemType" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+
+            <!-- Check Inventory Response -->
+            <xs:element name="CheckInventoryResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="items" type="tns:InventoryItemType" maxOccurs="unbounded"/>
+                        <xs:element name="checkedAt" type="xs:dateTime"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+
+            <!-- Reserve Inventory Response -->
+            <xs:element name="ReserveInventoryResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="reservationId" type="xs:string"/>
+                        <xs:element name="orderId" type="xs:string"/>
+                        <xs:element name="results" type="tns:ReservationResultType" maxOccurs="unbounded"/>
+                        <xs:element name="allReserved" type="xs:boolean"/>
+                        <xs:element name="reservedAt" type="xs:dateTime"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+
+        </xs:schema>
+    </wsdl:types>
+
+    <!-- Messages -->
+    <wsdl:message name="CheckInventoryRequest">
+        <wsdl:part element="tns:CheckInventoryRequest" name="CheckInventoryRequest"/>
+    </wsdl:message>
+    <wsdl:message name="CheckInventoryResponse">
+        <wsdl:part element="tns:CheckInventoryResponse" name="CheckInventoryResponse"/>
+    </wsdl:message>
+    <wsdl:message name="ReserveInventoryRequest">
+        <wsdl:part element="tns:ReserveInventoryRequest" name="ReserveInventoryRequest"/>
+    </wsdl:message>
+    <wsdl:message name="ReserveInventoryResponse">
+        <wsdl:part element="tns:ReserveInventoryResponse" name="ReserveInventoryResponse"/>
+    </wsdl:message>
+
+    <!-- Port Type -->
+    <wsdl:portType name="InventoryPort">
+        <wsdl:operation name="CheckInventory">
+            <wsdl:input message="tns:CheckInventoryRequest" name="CheckInventoryRequest"/>
+            <wsdl:output message="tns:CheckInventoryResponse" name="CheckInventoryResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="ReserveInventory">
+            <wsdl:input message="tns:ReserveInventoryRequest" name="ReserveInventoryRequest"/>
+            <wsdl:output message="tns:ReserveInventoryResponse" name="ReserveInventoryResponse"/>
+        </wsdl:operation>
+    </wsdl:portType>
+
+    <!-- Binding -->
+    <wsdl:binding name="InventoryPortSoap11" type="tns:InventoryPort">
+        <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+        <wsdl:operation name="CheckInventory">
+            <soap:operation soapAction=""/>
+            <wsdl:input name="CheckInventoryRequest">
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output name="CheckInventoryResponse">
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="ReserveInventory">
+            <soap:operation soapAction=""/>
+            <wsdl:input name="ReserveInventoryRequest">
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output name="ReserveInventoryResponse">
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+    </wsdl:binding>
+
+    <!-- Service -->
+    <wsdl:service name="InventoryService">
+        <wsdl:port binding="tns:InventoryPortSoap11" name="InventoryPortSoap11">
+            <soap:address location="http://localhost:8083/ws"/>
+        </wsdl:port>
+    </wsdl:service>
+
+</wsdl:definitions>
