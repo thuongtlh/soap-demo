@@ -91,6 +91,19 @@ soap-demo/
                 └── orders.wsdl              # Local WSDL for client generation
 ```
 
+## Documentation
+
+📚 **Comprehensive architecture documentation is available in the [docs](./docs) folder.**
+
+The [docs folder](./docs) contains detailed Mermaid diagrams and explanations for:
+- [System Architecture](./docs/system-architecture.md) - High-level system overview
+- [Component Diagram](./docs/component-diagram.md) - Detailed component relationships
+- [Data Model](./docs/data-model.md) - Complete data structures and mappings
+- [Technology Stack](./docs/technology-stack.md) - Framework dependencies and versions
+- [Create Order Sequence](./docs/create-order-sequence.md) - Order creation flow
+- [Get Order Sequence](./docs/get-order-sequence.md) - Order retrieval flow
+- [Deployment Architecture](./docs/deployment-architecture.md) - Deployment and runtime configuration
+
 ## Key Concepts Demonstrated
 
 ### 1. WSDL-First Approach
@@ -127,7 +140,156 @@ Generated classes include:
 - `OrdersPort` - Type-safe SOAP operations interface
 - `CreateOrderRequest`, `CreateOrderResponse`, etc. - JAXB data types
 
-### 3. JAX-WS SOAP Client
+### 3. Understanding JAXB and JAX-WS
+
+This project uses two key Java technologies for SOAP integration:
+
+#### JAXB (Java Architecture for XML Binding)
+
+**JAXB** handles the conversion between XML and Java objects (marshalling/unmarshalling):
+
+- **XML → Java (Unmarshalling)**: Converts incoming SOAP XML messages into Java objects
+- **Java → XML (Marshalling)**: Converts Java objects into outgoing SOAP XML messages
+- **Annotations**: Generated classes use JAXB annotations like:
+  - `@XmlRootElement` - Marks the root element of the XML
+  - `@XmlType` - Defines complex types with properties
+  - `@XmlElement` - Maps fields to XML elements
+  - `@XmlAccessorType` - Controls field/property access
+
+**Example of JAXB-annotated class:**
+```java
+@XmlRootElement(name = "CreateOrderRequest")
+@XmlType(propOrder = {"customer", "items", "notes", "priority"})
+public class CreateOrderRequest {
+    @XmlElement(required = true)
+    private CustomerType customer;
+    
+    @XmlElement(required = true)
+    private List<OrderItemType> items;
+    
+    private String notes;
+    private boolean priority;
+}
+```
+
+**Jakarta namespace**: Modern JAXB uses `jakarta.xml.bind.*` packages instead of the legacy `javax.xml.bind.*` (Jakarta EE 9+ migration).
+
+#### JAX-WS (Java API for XML Web Services)
+
+**JAX-WS** provides the SOAP client runtime that handles web service communication:
+
+- **Creates service proxy**: Generates `OrdersPort` interface for type-safe method calls
+- **Builds SOAP envelopes**: Wraps JAXB-marshalled objects in SOAP structure
+- **Sends HTTP requests**: Handles the HTTP/HTTPS transport layer
+- **Processes SOAP responses**: Unwraps SOAP envelopes and unmarshalls response data
+- **Handles SOAP faults**: Converts SOAP faults into Java exceptions
+
+**Key JAX-WS components:**
+```java
+// Service class - entry point for client
+OrdersService service = new OrdersService();
+
+// Port interface - type-safe operations
+OrdersPort port = service.getOrdersPortSoap11();
+
+// BindingProvider - runtime configuration
+BindingProvider provider = (BindingProvider) port;
+provider.getRequestContext().put(
+    BindingProvider.ENDPOINT_ADDRESS_PROPERTY,
+    "http://localhost:8081/ws"
+);
+
+// Type-safe method call - JAX-WS handles SOAP details
+CreateOrderResponse response = port.createOrder(request);
+```
+
+**Annotations:**
+- `@WebService` - Marks a service interface or implementation
+- `@WebMethod` - Defines a web service operation
+- `@SOAPBinding(parameterStyle = BARE)` - Parameters map directly to SOAP body parts
+- `@XmlSeeAlso(ObjectFactory.class)` - References the JAXB object factory for type context
+
+#### The Relationship: JAXB + JAX-WS
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Your Java Code                         │
+│  CreateOrderRequest request = new CreateOrderRequest();     │
+│  CreateOrderResponse response = port.createOrder(request);  │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                        JAX-WS Layer                         │
+│  • Builds SOAP envelope structure                           │
+│  • Manages HTTP connection                                  │
+│  • Handles SOAP headers and faults                          │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                        JAXB Layer                           │
+│  • Marshalls Java objects → XML                             │
+│  • Unmarshalls XML → Java objects                           │
+│  • Uses annotations to map fields                           │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+              SOAP XML over HTTP to server
+```
+
+#### Understanding "Binding"
+
+The term **"binding"** has different meanings in this context:
+
+1. **XML Binding (JAXB)**: How XML schema types are bound/mapped to Java classes
+   - Example: XSD `complexType` → Java class with `@XmlType`
+   - Example: XSD `string` → Java `String`
+
+2. **SOAP Binding (JAX-WS)**: How SOAP operations are bound/mapped to Java methods
+   - **Document/Literal**: SOAP body contains XML documents (most common)
+   - **RPC/Encoded**: SOAP body contains encoded method calls (legacy)
+   - **Parameter Style BARE**: Request object maps directly to SOAP body
+   - **Parameter Style WRAPPED**: Parameters wrapped in a request element
+
+**Example from this project:**
+```java
+@WebService
+@SOAPBinding(parameterStyle = SOAPBinding.ParameterStyle.BARE)
+public interface OrdersPort {
+    // BARE style: CreateOrderRequest directly in SOAP body
+    CreateOrderResponse createOrder(CreateOrderRequest request);
+}
+```
+
+#### Code Generation Flow
+
+```
+┌──────────────┐
+│   XSD Schema │  ← Source of truth (order.xsd)
+└──────┬───────┘
+       │
+       ▼ (Spring WS generates WSDL at runtime)
+┌──────────────┐
+│     WSDL     │  ← Service contract (orders.wsdl)
+└──────┬───────┘
+       │
+       ▼ (jaxws-maven-plugin: wsimport)
+┌──────────────────────────────────┐
+│   Generated Java Classes         │
+│  • OrdersService (JAX-WS)        │
+│  • OrdersPort (JAX-WS)           │
+│  • CreateOrderRequest (JAXB)     │
+│  • CreateOrderResponse (JAXB)    │
+│  • CustomerType (JAXB)           │
+│  • OrderItemType (JAXB)          │
+│  • ObjectFactory (JAXB)          │
+└──────────────────────────────────┘
+```
+
+The **ObjectFactory** class is a JAXB helper that creates instances of generated types with proper XML element wrapping.
+
+### 4. JAX-WS SOAP Client
 
 The SOAP client uses generated JAX-WS stubs for type-safe SOAP calls:
 
@@ -151,7 +313,7 @@ public class SoapClientConfig {
 }
 ```
 
-### 4. MapStruct Mapping
+### 5. MapStruct Mapping
 
 MapStruct generates efficient mapping code at compile time:
 
@@ -169,7 +331,7 @@ public interface OrderMapper {
 }
 ```
 
-### 5. OpenAPI / Swagger Integration
+### 6. OpenAPI / Swagger Integration
 
 REST API is documented using OpenAPI 3.0:
 - **Swagger UI**: http://localhost:8082/swagger-ui.html
@@ -315,12 +477,14 @@ When the SOAP service's XSD changes:
 |------------|---------|
 | Spring Boot 3.4.6 | Application framework |
 | Spring Web Services | SOAP endpoint (server-side) |
-| JAX-WS 4.0.2 | SOAP client (WSDL-first) |
-| JAXB | XML/Java binding |
+| JAX-WS 4.0.2 | SOAP client runtime (WSDL-first) |
+| JAXB (Jakarta XML Binding) | XML ↔ Java object binding (marshalling/unmarshalling) |
 | MapStruct 1.5.5 | Object mapping |
 | Lombok | Boilerplate reduction |
 | SpringDoc OpenAPI 2.8.4 | API documentation |
 | Jakarta Validation | Request validation |
+
+**Note**: This project uses Jakarta EE packages (`jakarta.xml.bind.*`, `jakarta.xml.ws.*`) instead of legacy Java EE packages (`javax.*`).
 
 ## Why These Technologies?
 
@@ -335,6 +499,14 @@ When the SOAP service's XSD changes:
 - **Type-safe operations** - `ordersPort.createOrder(request)` vs generic `marshalSendAndReceive()`
 - **WSDL-first native** - Designed for WSDL-based code generation
 - **Better tooling** - Industry-standard wsimport
+- **JAXB integration** - Seamless XML binding with generated types
+
+### JAXB for XML Binding
+- **Automatic code generation** - Java classes generated from XSD/WSDL
+- **Annotation-driven** - Declarative mapping with `@XmlElement`, `@XmlType`, etc.
+- **Jakarta namespace** - Modern `jakarta.xml.bind.*` packages (Jakarta EE 9+)
+- **Type-safe XML** - Compile-time validation of XML structure
+- **Bidirectional** - Marshalling (Java → XML) and unmarshalling (XML → Java)
 
 ### MapStruct over Manual Mapping
 - **Compile-time code generation** - no reflection overhead

@@ -10,6 +10,36 @@ graph TB
             Postman[Postman/curl<br/>API Testing]
         end
         
+        subgraph "REST Service Gateway - localhost:8084"
+            GatewayApp[Spring Boot Application<br/>GatewayServiceApplication]
+            
+            subgraph "Embedded Tomcat 8084"
+                GatewayEndpoints[REST Endpoints<br/>/api/v1/orders]
+                GatewaySwagger[Swagger UI<br/>/swagger-ui.html]
+                GatewayOpenAPI[OpenAPI Spec<br/>/v3/api-docs]
+            end
+            
+            subgraph "Gateway Beans"
+                GatewayComponents[Controllers<br/>Services<br/>Gateway<br/>Mappers<br/>SOAP Clients]
+            end
+            
+            subgraph "Resilience Components"
+                CircuitBreaker[Circuit Breaker<br/>Resilience4j]
+            end
+            
+            subgraph "JAX-WS Clients"
+                OrderStubs[Order SOAP Stubs<br/>OrdersPort]
+                InventoryStubs[Inventory SOAP Stubs<br/>InventoryPort]
+            end
+            
+            GatewayApp --> GatewayEndpoints
+            GatewayApp --> GatewaySwagger
+            GatewayApp --> GatewayComponents
+            GatewayComponents --> CircuitBreaker
+            CircuitBreaker --> OrderStubs
+            CircuitBreaker --> InventoryStubs
+        end
+        
         subgraph "REST Service - localhost:8082"
             RestApp[Spring Boot Application<br/>RestServiceApplication]
             
@@ -34,7 +64,7 @@ graph TB
             RestComponents --> JAXWSStubs
         end
         
-        subgraph "SOAP Service - localhost:8081"
+        subgraph "Order SOAP Service - localhost:8081"
             SoapApp[Spring Boot Application<br/>SoapServiceApplication]
             
             subgraph "Embedded Tomcat 8081"
@@ -56,25 +86,83 @@ graph TB
             SoapApp --> XSDSchema
         end
         
+        subgraph "Inventory SOAP Service - localhost:8083"
+            InventoryApp[Spring Boot Application<br/>InventoryServiceApplication]
+            
+            subgraph "Embedded Tomcat 8083"
+                InventoryEndpoints[SOAP Endpoints<br/>/ws/*]
+                InventoryWSDL[WSDL Endpoint<br/>/ws/inventory.wsdl]
+            end
+            
+            subgraph "Inventory Beans"
+                InventoryComponents[Endpoints<br/>Services<br/>JAXB Types]
+            end
+            
+            subgraph "Inventory Schema"
+                InventoryXSD[XSD Schema<br/>inventory.xsd]
+            end
+            
+            InventoryApp --> InventoryEndpoints
+            InventoryApp --> InventoryWSDL
+            InventoryApp --> InventoryComponents
+            InventoryApp --> InventoryXSD
+        end
+        
+        Browser -->|HTTP GET| GatewaySwagger
         Browser -->|HTTP GET| SwaggerUI
-        Browser -->|HTTP GET| OpenAPISpec
+        Postman -->|HTTP POST/GET<br/>JSON| GatewayEndpoints
         Postman -->|HTTP POST/GET<br/>JSON| RestEndpoints
-        Browser -->|Try It Out| RestEndpoints
         
         JAXWSStubs -->|HTTP POST<br/>SOAP/XML| SoapEndpoints
+        OrderStubs -->|HTTP POST<br/>SOAP/XML| SoapEndpoints
+        InventoryStubs -->|HTTP POST<br/>SOAP/XML| InventoryEndpoints
         
         Postman -.can fetch.-> WSDLEndpoint
+        Postman -.can fetch.-> InventoryWSDL
     end
     
     style Browser fill:#e1f5ff
     style Postman fill:#e1f5ff
+    style GatewayApp fill:#e3f2fd
     style RestApp fill:#fff3e0
     style SoapApp fill:#f3e5f5
+    style InventoryApp fill:#e1bee7
     style JAXWSStubs fill:#c5e1a5
+    style OrderStubs fill:#c5e1a5
+    style InventoryStubs fill:#c5e1a5
     style XSDSchema fill:#ffecb3
+    style InventoryXSD fill:#ffecb3
+    style CircuitBreaker fill:#ffcdd2
 ```
 
 ## Deployment Details
+
+### REST Service Gateway (Port 8084)
+
+#### Runtime Environment
+- **Framework**: Spring Boot 3.4.6
+- **Web Server**: Embedded Tomcat
+- **Port**: 8084
+- **Context Path**: /
+
+#### Exposed Endpoints
+- `POST /api/v1/orders` - Create order with inventory reservation
+- `POST /api/v1/orders/simple` - Create order without inventory
+- `GET /swagger-ui.html` - Interactive API documentation
+- `GET /v3/api-docs` - OpenAPI specification (JSON)
+
+#### Dependencies
+- **Order SOAP Service**: Connects to `http://localhost:8081/ws`
+- **Inventory SOAP Service**: Connects to `http://localhost:8083/ws`
+- **Configuration**: `soap.order-service.url` and `soap.inventory-service.url` in application.yml
+
+#### Key Components
+- Spring MVC for REST endpoints
+- JAX-WS for SOAP clients (Order + Inventory)
+- MapStruct for object mapping
+- Resilience4j for circuit breaker and retry
+- SpringDoc OpenAPI for documentation
+- Jakarta Validation for request validation
 
 ### REST Service (Port 8082)
 
@@ -102,7 +190,7 @@ graph TB
 - SpringDoc OpenAPI for documentation
 - Jakarta Validation for request validation
 
-### SOAP Service (Port 8081)
+### Order SOAP Service (Port 8081)
 
 #### Runtime Environment
 - **Framework**: Spring Boot 3.4.6
@@ -128,13 +216,41 @@ graph TB
 - JAXB for XML marshalling/unmarshalling
 - XSD schema for contract definition
 
+### Inventory SOAP Service (Port 8083)
+
+#### Runtime Environment
+- **Framework**: Spring Boot 3.4.6
+- **Web Server**: Embedded Tomcat
+- **Port**: 8083
+- **Context Path**: /
+
+#### Exposed Endpoints
+- `POST /ws` - SOAP endpoint for inventory operations
+- `GET /ws/inventory.wsdl` - WSDL definition (auto-generated)
+
+#### SOAP Operations
+- `checkInventory` - Check inventory availability for products
+- `reserveInventory` - Reserve inventory for an order
+
+#### Data Storage
+- In-memory storage using `HashMap`
+- Pre-populated with sample inventory data
+- For demonstration purposes only
+
+#### Key Components
+- Spring Web Services for SOAP endpoints
+- JAXB for XML marshalling/unmarshalling
+- XSD schema for contract definition
+
 ## Communication Flow
+
+### Simple Flow (REST Service)
 
 ```mermaid
 sequenceDiagram
     participant Client
     participant REST as REST Service<br/>:8082
-    participant SOAP as SOAP Service<br/>:8081
+    participant SOAP as Order SOAP<br/>:8081
     
     Client->>REST: HTTP Request<br/>(JSON)
     activate REST
@@ -155,74 +271,138 @@ sequenceDiagram
     deactivate REST
 ```
 
+### Gateway Flow (REST Gateway with Multiple SOAP Services)
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Gateway as REST Gateway<br/>:8084
+    participant Order as Order SOAP<br/>:8081
+    participant Inventory as Inventory SOAP<br/>:8083
+    
+    Client->>Gateway: HTTP POST /api/v1/orders<br/>(JSON)
+    activate Gateway
+    
+    Gateway->>Gateway: Validate & Map
+    
+    Gateway->>Order: createOrder<br/>(SOAP/XML)
+    activate Order
+    Order-->>Gateway: CreateOrderResponse
+    deactivate Order
+    
+    Gateway->>Inventory: reserveInventory<br/>(SOAP/XML)
+    activate Inventory
+    Inventory-->>Gateway: ReserveInventoryResponse
+    deactivate Inventory
+    
+    Gateway->>Gateway: Aggregate Responses
+    
+    Gateway-->>Client: HTTP 201 Created<br/>(JSON with order + inventory)
+    deactivate Gateway
+```
+
 ## Network Configuration
 
 ### Local Development
 ```
-┌─────────────────────────────────────┐
-│          localhost                  │
-│                                     │
-│  ┌──────────┐      ┌──────────┐   │
-│  │  :8082   │─────▶│  :8081   │   │
-│  │  REST    │      │  SOAP    │   │
-│  └──────────┘      └──────────┘   │
-│       ▲                             │
-│       │                             │
-│  ┌────┴────┐                       │
-│  │ Client  │                       │
-│  └─────────┘                       │
-└─────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                        localhost                             │
+│                                                              │
+│  ┌──────────┐    ┌──────────┐    ┌──────────┐              │
+│  │  :8084   │───▶│  :8081   │    │  :8083   │◀───┐         │
+│  │ Gateway  │    │  Order   │    │Inventory │    │         │
+│  └──────────┘    │  SOAP    │    │  SOAP    │    │         │
+│       │          └──────────┘    └──────────┘    │         │
+│       └──────────────────────────────────────────┘         │
+│                                                              │
+│  ┌──────────┐    ┌──────────┐                               │
+│  │  :8082   │───▶│  :8081   │                               │
+│  │  REST    │    │  Order   │                               │
+│  └──────────┘    │  SOAP    │                               │
+│       ▲          └──────────┘                               │
+│       │                                                      │
+│  ┌────┴────┐                                                │
+│  │ Client  │                                                │
+│  └─────────┘                                                │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ### Port Allocation
-- **8081**: SOAP Service
-- **8082**: REST Service
-- Both services run on localhost in development
+- **8081**: Order SOAP Service
+- **8082**: REST Service (simple)
+- **8083**: Inventory SOAP Service
+- **8084**: REST Service Gateway (orchestrates multiple SOAP services)
+- All services run on localhost in development
 
 ## Build and Runtime Process
 
 ```mermaid
 graph LR
     subgraph "Build Time"
-        XSD[XSD Schema<br/>order.xsd]
-        WSDL[WSDL File<br/>orders.wsdl]
+        OrderXSD[XSD Schema<br/>order.xsd]
+        InventoryXSD[XSD Schema<br/>inventory.xsd]
+        OrderWSDL[WSDL File<br/>orders.wsdl]
+        InventoryWSDL[WSDL File<br/>inventory.wsdl]
         
-        XSD -->|Spring WS generates| WSDL
-        WSDL -->|jaxws-maven-plugin| JAXWSCode[Generated<br/>JAX-WS Stubs]
+        OrderXSD -->|Spring WS generates| OrderWSDL
+        InventoryXSD -->|Spring WS generates| InventoryWSDL
+        OrderWSDL -->|jaxws-maven-plugin| OrderStubs[Order JAX-WS Stubs]
+        InventoryWSDL -->|jaxws-maven-plugin| InventoryStubs[Inventory JAX-WS Stubs]
         
         MapStructIF[MapStruct<br/>Interfaces]
         MapStructIF -->|mapstruct-processor| MapStructImpl[Generated<br/>Mapper Implementations]
     end
     
     subgraph "Runtime"
-        JAXWSCode --> RestRuntime[REST Service<br/>Runtime]
+        OrderStubs --> GatewayRuntime[Gateway Service<br/>Runtime]
+        InventoryStubs --> GatewayRuntime
+        MapStructImpl --> GatewayRuntime
+        
+        OrderStubs --> RestRuntime[REST Service<br/>Runtime]
         MapStructImpl --> RestRuntime
         
-        XSD --> SoapRuntime[SOAP Service<br/>Runtime]
+        OrderXSD --> OrderSoapRuntime[Order SOAP<br/>Runtime]
+        InventoryXSD --> InventorySoapRuntime[Inventory SOAP<br/>Runtime]
     end
     
-    style XSD fill:#fff9c4
-    style WSDL fill:#fff9c4
-    style JAXWSCode fill:#c5e1a5
+    style OrderXSD fill:#fff9c4
+    style InventoryXSD fill:#fff9c4
+    style OrderWSDL fill:#fff9c4
+    style InventoryWSDL fill:#fff9c4
+    style OrderStubs fill:#c5e1a5
+    style InventoryStubs fill:#c5e1a5
     style MapStructImpl fill:#c5e1a5
+    style GatewayRuntime fill:#e3f2fd
     style RestRuntime fill:#bbdefb
-    style SoapRuntime fill:#f8bbd0
+    style OrderSoapRuntime fill:#f8bbd0
+    style InventorySoapRuntime fill:#e1bee7
 ```
 
 ### Build Steps
 
-1. **SOAP Service Build**
-   - XSD schema loaded as resource
+1. **Order SOAP Service Build**
+   - XSD schema (`order.xsd`) loaded as resource
+   - Spring WS generates WSDL at startup
+   - JAXB generates classes from XSD (internal)
+
+2. **Inventory SOAP Service Build**
+   - XSD schema (`inventory.xsd`) loaded as resource
    - Spring WS generates WSDL at startup
    - JAXB generates classes from XSD (internal)
    
-2. **REST Service Build**
-   - Copy WSDL from SOAP service (manual step when schema changes)
+3. **REST Service Build**
+   - Copy WSDL from Order SOAP service (manual step when schema changes)
    - `jaxws-maven-plugin` generates JAX-WS client stubs from WSDL
    - `mapstruct-processor` generates mapper implementations
    - Compile application code with generated classes
-   
-3. **Packaging**
+
+4. **REST Gateway Service Build**
+   - Copy WSDLs from both SOAP services (Order + Inventory)
+   - `jaxws-maven-plugin` generates JAX-WS client stubs from both WSDLs
+   - `mapstruct-processor` generates mapper implementations
+   - Compile application code with generated classes
+    
+5. **Packaging**
    - Each service packaged as standalone JAR
    - Includes all dependencies (fat JAR)
    - Can run with `java -jar`
@@ -230,21 +410,35 @@ graph LR
 ## Starting the Services
 
 ### Order of Startup
-1. **Start SOAP Service First** (Port 8081)
+1. **Start Order SOAP Service First** (Port 8081)
    ```bash
    cd soap-service
    mvn spring-boot:run
    ```
 
-2. **Start REST Service Second** (Port 8082)
+2. **Start Inventory SOAP Service** (Port 8083)
+   ```bash
+   cd inventory-soap-service
+   mvn spring-boot:run
+   ```
+
+3. **Start REST Service** (Port 8082) - Optional
    ```bash
    cd rest-service
    mvn spring-boot:run
    ```
 
+4. **Start REST Gateway Service** (Port 8084)
+   ```bash
+   cd rest-service-gateway
+   mvn spring-boot:run
+   ```
+
 ### Health Check
-- SOAP Service: `curl http://localhost:8081/ws/orders.wsdl`
+- Order SOAP Service: `curl http://localhost:8081/ws/orders.wsdl`
+- Inventory SOAP Service: `curl http://localhost:8083/ws/inventory.wsdl`
 - REST Service: `curl http://localhost:8082/v3/api-docs`
+- REST Gateway Service: `curl http://localhost:8084/v3/api-docs`
 
 ## Production Considerations
 
@@ -256,15 +450,20 @@ graph TB
         LB[Load Balancer]
     end
     
-    subgraph "REST Service Cluster"
-        REST1[REST Instance 1]
-        REST2[REST Instance 2]
-        REST3[REST Instance 3]
+    subgraph "REST Gateway Cluster"
+        GW1[Gateway Instance 1]
+        GW2[Gateway Instance 2]
+        GW3[Gateway Instance 3]
     end
     
-    subgraph "SOAP Service Cluster"
-        SOAP1[SOAP Instance 1]
-        SOAP2[SOAP Instance 2]
+    subgraph "Order SOAP Cluster"
+        OrderSOAP1[Order SOAP 1]
+        OrderSOAP2[Order SOAP 2]
+    end
+    
+    subgraph "Inventory SOAP Cluster"
+        InvSOAP1[Inventory SOAP 1]
+        InvSOAP2[Inventory SOAP 2]
     end
     
     subgraph "Data Layer"
@@ -272,21 +471,29 @@ graph TB
         Cache[(Cache<br/>Redis)]
     end
     
-    LB --> REST1
-    LB --> REST2
-    LB --> REST3
+    LB --> GW1
+    LB --> GW2
+    LB --> GW3
     
-    REST1 --> SOAP1
-    REST1 --> SOAP2
-    REST2 --> SOAP1
-    REST2 --> SOAP2
-    REST3 --> SOAP1
-    REST3 --> SOAP2
+    GW1 --> OrderSOAP1
+    GW1 --> OrderSOAP2
+    GW1 --> InvSOAP1
+    GW1 --> InvSOAP2
+    GW2 --> OrderSOAP1
+    GW2 --> OrderSOAP2
+    GW2 --> InvSOAP1
+    GW2 --> InvSOAP2
+    GW3 --> OrderSOAP1
+    GW3 --> OrderSOAP2
+    GW3 --> InvSOAP1
+    GW3 --> InvSOAP2
     
-    SOAP1 --> DB
-    SOAP2 --> DB
-    SOAP1 --> Cache
-    SOAP2 --> Cache
+    OrderSOAP1 --> DB
+    OrderSOAP2 --> DB
+    InvSOAP1 --> DB
+    InvSOAP2 --> DB
+    OrderSOAP1 --> Cache
+    OrderSOAP2 --> Cache
 ```
 
 ### Production Enhancements Needed
@@ -297,11 +504,47 @@ graph TB
 5. **Monitoring**: Add metrics, logging, tracing (Prometheus, ELK, Zipkin)
 6. **Security**: Add authentication, authorization, TLS/SSL
 7. **Configuration**: Externalize configuration (Spring Cloud Config)
-8. **Resilience**: Add circuit breakers, retry logic, timeouts
+8. **Resilience**: Circuit breakers and retry (already in Gateway with Resilience4j)
 9. **Container Deployment**: Docker containers, Kubernetes orchestration
-10. **API Gateway**: Add API gateway for rate limiting, routing
+10. **API Gateway**: Already implemented with REST Gateway pattern
 
 ## Configuration Files
+
+### REST Gateway Service - application.yml
+```yaml
+server:
+  port: 8084
+
+soap:
+  order-service:
+    url: http://localhost:8081/ws
+  inventory-service:
+    url: http://localhost:8083/ws
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      orderService:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+      inventoryService:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+  retry:
+    instances:
+      orderService:
+        maxAttempts: 3
+        waitDuration: 1s
+      inventoryService:
+        maxAttempts: 3
+        waitDuration: 1s
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+```
 
 ### REST Service - application.yml
 ```yaml
@@ -319,10 +562,20 @@ springdoc:
     path: /swagger-ui.html
 ```
 
-### SOAP Service - application.yml
+### Order SOAP Service - application.yml
 ```yaml
 server:
   port: 8081
+
+spring:
+  ws:
+    path: /ws
+```
+
+### Inventory SOAP Service - application.yml
+```yaml
+server:
+  port: 8083
 
 spring:
   ws:
@@ -342,3 +595,4 @@ spring:
 - Monitor SOAP call success/failure rates
 - Log mapping exceptions
 - Track API usage patterns
+- Monitor circuit breaker states (Gateway)

@@ -206,7 +206,9 @@ graph TB
     
     subgraph "Module POMs"
         RestPOM[rest-service<br/>pom.xml]
+        GatewayPOM[rest-service-gateway<br/>pom.xml]
         SoapPOM[soap-service<br/>pom.xml]
+        InventoryPOM[inventory-soap-service<br/>pom.xml]
     end
     
     subgraph "Spring Boot"
@@ -214,14 +216,19 @@ graph TB
     end
     
     ParentPOM --> RestPOM
+    ParentPOM --> GatewayPOM
     ParentPOM --> SoapPOM
+    ParentPOM --> InventoryPOM
     ParentPOM --> SpringBootParent
     
     RestPOM --> RestDeps[Spring Web<br/>JAX-WS<br/>MapStruct<br/>SpringDoc<br/>Lombok]
+    GatewayPOM --> GatewayDeps[Spring Web<br/>JAX-WS<br/>MapStruct<br/>Resilience4j<br/>SpringDoc<br/>Lombok]
     SoapPOM --> SoapDeps[Spring WS<br/>JAXB<br/>Lombok]
+    InventoryPOM --> InventoryDeps[Spring WS<br/>JAXB<br/>Lombok]
     
     style ParentPOM fill:#FFE0B2
     style SpringBootParent fill:#C5E1A5
+    style GatewayPOM fill:#E3F2FD
 ```
 
 ## Technology Versions
@@ -238,6 +245,7 @@ graph TB
 | SpringDoc OpenAPI | 2.8.4 | API documentation |
 | Jakarta Validation | 3.x | Bean validation |
 | Lombok | 1.18.30 | Boilerplate reduction |
+| Resilience4j | 2.2.0 | Circuit breaker & retry |
 | Maven | 3.8+ | Build tool |
 
 ## Technology Choices Rationale
@@ -277,13 +285,21 @@ graph TB
 - ✅ Spring Boot 3 compatible
 - ✅ Rich annotations
 
+### Resilience4j 2.2.0
+- ✅ Lightweight, fast library
+- ✅ Circuit breaker pattern
+- ✅ Retry mechanism with exponential backoff
+- ✅ Spring Boot 3 integration
+- ✅ Modular design
+
 ## Integration Patterns Used
 
-### 1. API Gateway Pattern (REST as Gateway)
+### 1. API Gateway Pattern (REST Gateway)
 ```
-Client → REST API → SOAP Service
+Client → REST Gateway → Order SOAP Service
+                    └─→ Inventory SOAP Service
 ```
-REST service acts as a modern gateway to legacy SOAP service.
+REST Gateway orchestrates calls to multiple SOAP backend services.
 
 ### 2. Adapter Pattern (MapStruct Mappers)
 ```
@@ -308,6 +324,12 @@ Service provides simplified interface to complex subsystems.
 XSD Schema → Generated Code → Implementation
 ```
 Contract defines the interface, code is generated.
+
+### 6. Circuit Breaker Pattern (Resilience4j)
+```
+Gateway → Circuit Breaker → SOAP Client
+```
+Protects against cascading failures with circuit breaker and retry.
 
 ## Build Lifecycle
 
