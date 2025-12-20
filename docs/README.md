@@ -2,19 +2,30 @@
 
 This directory contains comprehensive architecture documentation for the REST to SOAP Integration Demo application. All diagrams are created using [Mermaid](https://mermaid.js.org/), a markdown-based diagramming tool that renders beautifully on GitHub.
 
+## 🏗️ System Overview
+
+The demo application consists of **4 services**:
+
+| Service | Port | Description |
+|---------|------|-------------|
+| **REST Service Gateway** | 8084 | Gateway orchestrating multiple SOAP services with Resilience4j |
+| **REST Service** | 8082 | Simple REST to SOAP integration |
+| **Order SOAP Service** | 8081 | SOAP service for order management |
+| **Inventory SOAP Service** | 8083 | SOAP service for inventory management |
+
 ## 📚 Documentation Index
 
 ### 1. [System Architecture](system-architecture.md)
 High-level overview of the system architecture showing the major components and their interactions.
 
 **Contents:**
-- System components overview
+- System components overview (all 4 services)
 - Communication flow between services
 - Technology stack
 - Layer responsibilities
 
 **Diagrams:**
-- System architecture diagram with REST and SOAP services
+- System architecture diagram with REST Gateway, REST Service, and both SOAP services
 - Component interaction flow
 
 **When to use:** Start here to understand the overall system design and how the pieces fit together.
@@ -25,14 +36,15 @@ High-level overview of the system architecture showing the major components and 
 Detailed component-level view showing all classes, their dependencies, and relationships.
 
 **Contents:**
-- REST service components (Controllers, Services, Clients, Mappers, DTOs)
-- SOAP service components (Endpoints, Services, Configuration)
-- Configuration components
+- REST Gateway components (Controllers, Services, Gateway, Clients, Resilience)
+- REST Service components (Controllers, Services, Clients, Mappers, DTOs)
+- Order SOAP service components (Endpoints, Services, Configuration)
+- Inventory SOAP service components (Endpoints, Services, Configuration)
 - Generated code components (JAX-WS stubs, JAXB types)
 - Dependency relationships
 
 **Diagrams:**
-- Comprehensive component diagram with all classes
+- Comprehensive component diagrams for each service
 - Dependency arrows showing relationships
 
 **When to use:** When you need to understand the internal structure of each service and how components depend on each other.
@@ -159,12 +171,14 @@ Comprehensive view of the technology stack, architectural layers, and framework 
 |------|----------------------|
 | Adding a new REST endpoint | Component Diagram, Data Model |
 | Adding a new SOAP operation | System Architecture, Deployment Architecture |
+| Adding a new SOAP service | Component Diagram, Deployment Architecture |
 | Modifying data structures | Data Model, both Sequence Diagrams |
 | Debugging integration issues | Sequence Diagrams, System Architecture |
 | Deploying to a new environment | Deployment Architecture |
 | Understanding mappings | Data Model, Component Diagram |
 | Evaluating technology choices | Technology Stack |
 | Understanding the build process | Technology Stack, Deployment Architecture |
+| Understanding gateway pattern | Component Diagram, Technology Stack |
 
 ---
 
@@ -179,6 +193,7 @@ This architecture documentation covers:
 - **MapStruct 1.5.5**: Object mapping
 - **SpringDoc OpenAPI**: API documentation
 - **Jakarta Validation**: Request validation
+- **Resilience4j 2.2.0**: Circuit breaker and retry patterns
 
 ---
 
